@@ -5,7 +5,7 @@ A full-stack sealed-bid auction application built with **Next.js**, **NestJS**, 
 ## Quick start
 
 1. Copy `apps/api/.env.example` to `apps/api/.env`.
-2. `cd apps/api && npx prisma migrate dev --name init`
+2. `cd apps/api && npx prisma migrate dev --name init && npm run seed`
 3. Start the API: `npm run dev:api`
 4. Start the web app in another terminal: `npm run dev:web`
 5. Open `http://localhost:3000`.
@@ -28,6 +28,12 @@ All endpoints require `x-user-id` and `x-user-role` (`ADMIN` or `BIDDER`).
 - `POST /auctions` (admin)
 - `POST /auctions/:id/commitments`
 - `POST /auctions/:id/reveal`
+
+Interactive API documentation is available at `http://localhost:3001/api/docs`. Seeded data covers commitment, reveal, and closed auction states.
+
+## Testing
+
+Run `npm test` for focused auction-rule tests. They cover lifecycle time boundaries, timeline validation, valid-reveal selection, and deterministic tie-breaking.
 
 ## Production considerations
 

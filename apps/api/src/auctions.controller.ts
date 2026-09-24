@@ -3,9 +3,11 @@ import { HeaderAuthGuard, requireAdmin } from './auth.js';
 import type { AuthenticatedRequest } from './auth.js';
 import { CommitBidDto, CreateAuctionDto, RevealBidDto } from './auction.dto.js';
 import { AuctionsService } from './auctions.service.js';
+import { ApiTags } from '@nestjs/swagger';
 
 @Controller('auctions')
 @UseGuards(HeaderAuthGuard)
+@ApiTags('auctions')
 export class AuctionsController {
   constructor(private readonly auctions: AuctionsService) {}
 
