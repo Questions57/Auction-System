@@ -109,6 +109,7 @@ export class AuctionsService {
         revealedAt: bid.revealedAt,
         amountCents: canSeeReveals ? bid.amountCents : undefined,
         bidderName: viewer.role === Role.ADMIN || bid.bidderId === viewer.id ? bid.bidder.name : undefined,
+        commitmentHash: viewer.role === Role.ADMIN ? bid.commitmentHash : undefined,
       })),
     };
   }

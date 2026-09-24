@@ -16,6 +16,17 @@ type Auction = {
   winner?: { bidderName: string; amountCents: number };
 };
 
+type AuctionDetail = Auction & {
+  bids: {
+    id: string;
+    bidderName?: string;
+    commitmentHash?: string;
+    committedAt: string;
+    revealedAt?: string;
+    amountCents?: number | null;
+  }[];
+};
+
 const demoUser = { id: "demo-bidder", role: "BIDDER" };
 
 function money(cents: number) {
@@ -31,6 +42,7 @@ async function sha256(value: string) {
 export default function Home() {
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [selected, setSelected] = useState<Auction | null>(null);
+  const [auctionDetail, setAuctionDetail] = useState<AuctionDetail | null>(null);
   const [amount, setAmount] = useState("");
   const [notice, setNotice] = useState("Loading auctions...");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,6 +70,23 @@ export default function Home() {
   useEffect(() => {
     void loadAuctions();
   }, [role]);
+
+  useEffect(() => {
+    async function loadAuctionDetail() {
+      if (!selected) {
+        setAuctionDetail(null);
+        return;
+      }
+      try {
+        const response = await fetch(`${API_URL}/auctions/${selected.id}`, { headers });
+        if (!response.ok) throw new Error("Unable to load auction detail.");
+        setAuctionDetail(await response.json());
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : "Unable to load auction detail.");
+      }
+    }
+    void loadAuctionDetail();
+  }, [selected?.id, role, headers]);
 
   async function createAuction(event: FormEvent) {
     event.preventDefault();
@@ -147,14 +176,42 @@ export default function Home() {
         <button className={role === "ADMIN" ? "active" : ""} onClick={() => setRole("ADMIN")}>Administrator</button>
       </div>
       {role === "ADMIN" && (
-        <form className="schedule-form" onSubmit={createAuction}>
-          <div><p className="eyebrow">ADMINISTRATION</p><h3>Schedule an auction</h3></div>
-          <input aria-label="Auction title" value={schedule.title} onChange={(event) => setSchedule({ ...schedule, title: event.target.value })} placeholder="Auction title" required />
-          <input aria-label="Commitment start" type="datetime-local" value={schedule.startsAt} onChange={(event) => setSchedule({ ...schedule, startsAt: event.target.value })} required />
-          <input aria-label="Reveal start" type="datetime-local" value={schedule.revealAt} onChange={(event) => setSchedule({ ...schedule, revealAt: event.target.value })} required />
-          <input aria-label="Auction end" type="datetime-local" value={schedule.endsAt} onChange={(event) => setSchedule({ ...schedule, endsAt: event.target.value })} required />
-          <button disabled={isSubmitting}>{isSubmitting ? "Scheduling..." : "Schedule"}</button>
-        </form>
+        <>
+          <form className="schedule-form" onSubmit={createAuction}>
+            <div><p className="eyebrow">ADMINISTRATION</p><h3>Schedule an auction</h3></div>
+            <input aria-label="Auction title" value={schedule.title} onChange={(event) => setSchedule({ ...schedule, title: event.target.value })} placeholder="Auction title" required />
+            <input aria-label="Commitment start" type="datetime-local" value={schedule.startsAt} onChange={(event) => setSchedule({ ...schedule, startsAt: event.target.value })} required />
+            <input aria-label="Reveal start" type="datetime-local" value={schedule.revealAt} onChange={(event) => setSchedule({ ...schedule, revealAt: event.target.value })} required />
+            <input aria-label="Auction end" type="datetime-local" value={schedule.endsAt} onChange={(event) => setSchedule({ ...schedule, endsAt: event.target.value })} required />
+            <button disabled={isSubmitting}>{isSubmitting ? "Scheduling..." : "Schedule"}</button>
+          </form>
+          {auctionDetail && (
+            <section className="admin-panel" aria-label="Selected auction bid audit">
+              <div className="admin-panel-title">
+                <div><p className="eyebrow">BID AUDIT</p><h3>{auctionDetail.title}</h3></div>
+                <span>{auctionDetail.bids.length} commitment{auctionDetail.bids.length === 1 ? "" : "s"}</span>
+              </div>
+              {auctionDetail.bids.length ? (
+                <div className="bid-table-wrap">
+                  <table>
+                    <thead><tr><th>Bidder</th><th>Committed</th><th>Reveal</th><th>Amount</th><th>Commitment</th></tr></thead>
+                    <tbody>
+                      {auctionDetail.bids.map((bid) => (
+                        <tr key={bid.id}>
+                          <td>{bid.bidderName}</td>
+                          <td>{new Date(bid.committedAt).toLocaleString()}</td>
+                          <td>{bid.revealedAt ? new Date(bid.revealedAt).toLocaleString() : "Pending"}</td>
+                          <td>{bid.amountCents === null || bid.amountCents === undefined ? "Sealed" : money(bid.amountCents)}</td>
+                          <td><code>{bid.commitmentHash?.slice(0, 12)}...</code></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : <p className="empty-audit">No commitments have been submitted for this auction.</p>}
+            </section>
+          )}
+        </>
       )}
       <section className="layout">
         <aside className="auction-list" aria-label="Auctions">

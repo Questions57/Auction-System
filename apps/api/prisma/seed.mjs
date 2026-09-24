@@ -50,10 +50,10 @@ async function main() {
   const nonce = 'demo-reveal-nonce';
   await prisma.bid.createMany({
     data: [
-      { auctionId: committing.id, bidderId: 'demo-bidder', commitmentHash: hash(committing.id, 'demo-bidder', 250000, nonce) },
-      { auctionId: reveal.id, bidderId: 'demo-bidder', commitmentHash: hash(reveal.id, 'demo-bidder', 250000, nonce) },
-      { auctionId: closed.id, bidderId: 'demo-bidder', commitmentHash: hash(closed.id, 'demo-bidder', 250000, nonce), amountCents: 250000, nonce, revealedAt: new Date(now - 2 * 60 * 60 * 1000) },
-      { auctionId: closed.id, bidderId: 'rival-bidder', commitmentHash: hash(closed.id, 'rival-bidder', 240000, nonce), amountCents: 240000, nonce, revealedAt: new Date(now - 2 * 60 * 60 * 1000) },
+      { auctionId: committing.id, bidderId: 'demo-bidder', commitmentHash: hash(committing.id, 'demo-bidder', 250000, nonce), committedAt: new Date(now - 30 * 60 * 1000) },
+      { auctionId: reveal.id, bidderId: 'demo-bidder', commitmentHash: hash(reveal.id, 'demo-bidder', 250000, nonce), committedAt: new Date(now - 90 * 60 * 1000) },
+      { auctionId: closed.id, bidderId: 'demo-bidder', commitmentHash: hash(closed.id, 'demo-bidder', 250000, nonce), amountCents: 250000, nonce, committedAt: new Date(now - 3.5 * 60 * 60 * 1000), revealedAt: new Date(now - 2 * 60 * 60 * 1000) },
+      { auctionId: closed.id, bidderId: 'rival-bidder', commitmentHash: hash(closed.id, 'rival-bidder', 240000, nonce), amountCents: 240000, nonce, committedAt: new Date(now - 3.25 * 60 * 60 * 1000), revealedAt: new Date(now - 2 * 60 * 60 * 1000) },
     ],
   });
 }
