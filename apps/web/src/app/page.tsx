@@ -45,6 +45,8 @@ export default function Home() {
   const [selected, setSelected] = useState<Auction | null>(null);
   const [auctionDetail, setAuctionDetail] = useState<AuctionDetail | null>(null);
   const [amount, setAmount] = useState("");
+  const [revealAmount, setRevealAmount] = useState("");
+  const [revealNonce, setRevealNonce] = useState("");
   const [toast, setToast] = useState<Toast | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [role, setRole] = useState<"BIDDER" | "ADMIN">("BIDDER");
@@ -91,7 +93,17 @@ export default function Home() {
   }, [selected?.id, role, headers]);
 
   useEffect(() => {
-    setHasRevealCredentials(Boolean(selected && localStorage.getItem(`auction-nonce:${selected.id}`)));
+    const saved = selected && localStorage.getItem(`auction-nonce:${selected.id}`);
+    if (!saved) {
+      setHasRevealCredentials(false);
+      setRevealAmount("");
+      setRevealNonce("");
+      return;
+    }
+    const { amountCents, nonce } = JSON.parse(saved) as { amountCents: number; nonce: string };
+    setHasRevealCredentials(true);
+    setRevealAmount((amountCents / 100).toFixed(2));
+    setRevealNonce(nonce);
   }, [selected?.id]);
 
   useEffect(() => {
@@ -129,14 +141,14 @@ export default function Home() {
   async function submitBid(event: FormEvent) {
     event.preventDefault();
     if (!selected) return;
-    const amountCents = Math.round(Number(amount) * 100);
-    if (!Number.isSafeInteger(amountCents) || amountCents < 1) {
-      setToast({ kind: "error", message: "Enter a valid bid amount in US dollars." });
-      return;
-    }
     setIsSubmitting(true);
     try {
       if (selected.status === "COMMITTING") {
+        const amountCents = Math.round(Number(amount) * 100);
+        if (!Number.isSafeInteger(amountCents) || amountCents < 1) {
+          setToast({ kind: "error", message: "Enter a valid bid amount in US dollars." });
+          return;
+        }
         const replacing = selected.hasCurrentUserCommitment;
         setToast({ kind: "info", message: replacing ? "Replacing your sealed offer…" : "Creating your sealed offer…" });
         const nonce = crypto.randomUUID();
@@ -155,22 +167,19 @@ export default function Home() {
             : "Sealed offer committed successfully. This browser holds the credentials required to reveal it.",
         });
       } else if (selected.status === "REVEALING") {
-        const saved = localStorage.getItem(`auction-nonce:${selected.id}`);
-        if (!saved) {
-          setToast({
-            kind: "error",
-            message: "Maya Chen has a commitment, but this browser does not hold its amount and nonce. It cannot be revealed here.",
-          });
+        const amountCents = Math.round(Number(revealAmount) * 100);
+        if (!Number.isSafeInteger(amountCents) || amountCents < 1 || !revealNonce.trim()) {
+          setToast({ kind: "error", message: "Enter the original offer and reveal nonce for Maya Chen’s commitment." });
           return;
         }
         setToast({ kind: "info", message: "Verifying Maya Chen’s saved amount and nonce against the auction commitment…" });
-        const { nonce, amountCents: committedAmount } = JSON.parse(saved) as { nonce: string; amountCents: number };
         const response = await fetch(`${API_URL}/auctions/${selected.id}/reveal`, {
-          method: "POST", headers, body: JSON.stringify({ nonce, amountCents: committedAmount }),
+          method: "POST", headers, body: JSON.stringify({ nonce: revealNonce.trim(), amountCents }),
         });
         const body = await response.json();
         if (!response.ok) throw new Error(body.message ?? "Could not reveal your bid.");
         setToast({ kind: "success", message: "Maya Chen’s offer was verified and revealed. It will be considered when the auction closes." });
+        setRevealNonce("");
       }
       setAmount("");
       await loadAuctions();
@@ -283,7 +292,7 @@ export default function Home() {
               <div><dt>Reveal begins</dt><dd>{new Date(selected.revealAt).toLocaleString()}</dd></div>
               <div><dt>Auction closes</dt><dd>{new Date(selected.endsAt).toLocaleString()}</dd></div>
             </dl>
-            {role === "BIDDER" && (selected.status === "COMMITTING" || selected.status === "REVEALING") && (
+            {role === "BIDDER" && (selected.status === "COMMITTING" || (selected.status === "REVEALING" && selected.hasCurrentUserCommitment)) && (
               <form onSubmit={submitBid} className="bid-form">
                 {selected.status === "COMMITTING" ? (
                   <>
@@ -301,12 +310,19 @@ export default function Home() {
                 ) : (
                   <>
                     <h3>Reveal your offer</h3>
-                    <p>You are viewing as Maya Chen. Revealing sends this browser’s saved amount and private nonce to the API, which verifies them against Maya Chen’s original commitment.</p>
-                    {!hasRevealCredentials && <p className="credential-warning">This browser does not have Maya Chen’s reveal credentials, so it cannot reveal this seeded commitment.</p>}
-                    <button disabled={isSubmitting || !hasRevealCredentials}>{isSubmitting ? "Verifying..." : hasRevealCredentials ? "Reveal Maya Chen’s bid" : "Reveal credentials unavailable"}</button>
+                    <p>You are viewing as Maya Chen. Reveal the original offer and private nonce; the API verifies both against Maya Chen’s commitment.</p>
+                    <label htmlFor="reveal-amount">Original offer (USD)</label>
+                    <input id="reveal-amount" type="number" min="0.01" step="0.01" value={revealAmount} onChange={(event) => setRevealAmount(event.target.value)} placeholder="0.00" required />
+                    <label htmlFor="reveal-nonce">Private reveal nonce</label>
+                    <input id="reveal-nonce" value={revealNonce} onChange={(event) => setRevealNonce(event.target.value)} placeholder="Paste the nonce saved at commitment time" required />
+                    {!hasRevealCredentials && <p className="credential-warning">This browser has no saved credentials. Enter the original offer and nonce from your secure record to reveal this bid.</p>}
+                    <button disabled={isSubmitting}>{isSubmitting ? "Verifying..." : "Reveal Maya Chen’s bid"}</button>
                   </>
                 )}
               </form>
+            )}
+            {role === "BIDDER" && selected.status === "REVEALING" && !selected.hasCurrentUserCommitment && (
+              <p className="admin-read-only">Maya Chen did not commit an offer for this auction, so there is no bid available to reveal.</p>
             )}
             {role === "ADMIN" && (selected.status === "COMMITTING" || selected.status === "REVEALING") && (
               <p className="admin-read-only">Administrator view is read-only. Bid actions are available only to authorized bidders.</p>
