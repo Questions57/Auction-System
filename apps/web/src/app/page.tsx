@@ -49,6 +49,7 @@ export default function Home() {
   const [amount, setAmount] = useState("");
   const [revealAmount, setRevealAmount] = useState("");
   const [revealNonce, setRevealNonce] = useState("");
+  const [revealError, setRevealError] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [role, setRole] = useState<"BIDDER" | "ADMIN">("BIDDER");
@@ -173,22 +174,33 @@ export default function Home() {
       } else if (selected.status === "REVEALING") {
         const amountCents = Math.round(Number(revealAmount) * 100);
         if (!Number.isSafeInteger(amountCents) || amountCents < 1 || !revealNonce.trim()) {
-          setToast({ kind: "error", message: "Enter the original offer and reveal nonce for Adarsh Patel’s commitment." });
+          const message = "Enter the original offer and reveal nonce for Adarsh Patel’s commitment.";
+          setRevealError(message);
+          setToast({ kind: "error", message });
           return;
         }
+        setRevealError(null);
         setToast({ kind: "info", message: "Verifying Adarsh Patel’s saved amount and nonce against the auction commitment…" });
         const response = await fetch(`${API_URL}/auctions/${selected.id}/reveal`, {
           method: "POST", headers, body: JSON.stringify({ nonce: revealNonce.trim(), amountCents }),
         });
         const body = await response.json();
-        if (!response.ok) throw new Error(body.message ?? "Could not reveal your bid.");
+        if (!response.ok) {
+          const message = body.message ?? "Could not reveal your bid.";
+          setRevealError(message);
+          setToast({ kind: "error", message });
+          return;
+        }
         setToast({ kind: "success", message: "Adarsh Patel’s offer was verified and revealed. It will be considered when the auction closes." });
+        setRevealError(null);
         setRevealNonce("");
       }
       setAmount("");
       await loadAuctions();
     } catch (error) {
-      setToast({ kind: "error", message: error instanceof Error ? error.message : "Unable to submit bid." });
+      const message = error instanceof Error ? error.message : "Unable to submit bid.";
+      if (selected.status === "REVEALING") setRevealError(message);
+      setToast({ kind: "error", message });
     } finally {
       setIsSubmitting(false);
     }
@@ -331,15 +343,16 @@ export default function Home() {
                     <div className="reveal-fields">
                       <div>
                         <label htmlFor="reveal-amount">Original offer (USD)</label>
-                        <input id="reveal-amount" type="number" min="0.01" step="0.01" value={revealAmount} onChange={(event) => setRevealAmount(event.target.value)} placeholder="0.00" required />
+                        <input id="reveal-amount" type="number" min="0.01" step="0.01" value={revealAmount} onChange={(event) => { setRevealAmount(event.target.value); setRevealError(null); }} placeholder="0.00" required />
                       </div>
                       <div>
                         <label htmlFor="reveal-nonce">Private reveal nonce</label>
-                        <input id="reveal-nonce" value={revealNonce} onChange={(event) => setRevealNonce(event.target.value)} placeholder="Paste the nonce saved at commitment time" required />
+                        <input id="reveal-nonce" value={revealNonce} onChange={(event) => { setRevealNonce(event.target.value); setRevealError(null); }} placeholder="Paste the nonce saved at commitment time" required />
                       </div>
                     </div>
                     {!hasRevealCredentials && <p className="credential-warning">This browser has no saved credentials. Enter the original offer and nonce from your secure record to reveal this bid.</p>}
                     <button disabled={isSubmitting}>{isSubmitting ? "Verifying..." : "Reveal Adarsh Patel’s bid"}</button>
+                    {revealError && <p className="reveal-error" role="alert">{revealError}</p>}
                   </>
                 )}
               </form>
