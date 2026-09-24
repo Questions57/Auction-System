@@ -28,6 +28,7 @@ type AuctionDetail = Auction & {
 };
 
 const demoUser = { id: "demo-bidder", role: "BIDDER" };
+type Toast = { kind: "success" | "error" | "info"; message: string };
 
 function money(cents: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
@@ -44,10 +45,11 @@ export default function Home() {
   const [selected, setSelected] = useState<Auction | null>(null);
   const [auctionDetail, setAuctionDetail] = useState<AuctionDetail | null>(null);
   const [amount, setAmount] = useState("");
-  const [notice, setNotice] = useState("Loading auctions...");
+  const [toast, setToast] = useState<Toast | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [role, setRole] = useState<"BIDDER" | "ADMIN">("BIDDER");
   const [schedule, setSchedule] = useState({ title: "", startsAt: "", revealAt: "", endsAt: "" });
+  const [hasRevealCredentials, setHasRevealCredentials] = useState(false);
 
   const headers = useMemo(
     () => ({ "Content-Type": "application/json", "x-user-id": role === "ADMIN" ? "demo-admin" : demoUser.id, "x-user-role": role }),
@@ -61,9 +63,9 @@ export default function Home() {
       const data = await response.json();
       setAuctions(data);
       setSelected((current) => data.find((auction: Auction) => auction.id === current?.id) ?? data[0] ?? null);
-      setNotice(data.length ? "" : "No auctions have been scheduled yet.");
+      if (!data.length) setToast({ kind: "info", message: "No auctions have been scheduled yet." });
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Unable to load auctions.");
+      setToast({ kind: "error", message: error instanceof Error ? error.message : "Unable to load auctions." });
     }
   }
 
@@ -82,11 +84,21 @@ export default function Home() {
         if (!response.ok) throw new Error("Unable to load auction detail.");
         setAuctionDetail(await response.json());
       } catch (error) {
-        setNotice(error instanceof Error ? error.message : "Unable to load auction detail.");
+        setToast({ kind: "error", message: error instanceof Error ? error.message : "Unable to load auction detail." });
       }
     }
     void loadAuctionDetail();
   }, [selected?.id, role, headers]);
+
+  useEffect(() => {
+    setHasRevealCredentials(Boolean(selected && localStorage.getItem(`auction-nonce:${selected.id}`)));
+  }, [selected?.id]);
+
+  useEffect(() => {
+    if (!toast || toast.kind === "error") return;
+    const timeout = window.setTimeout(() => setToast(null), 6500);
+    return () => window.clearTimeout(timeout);
+  }, [toast]);
 
   async function createAuction(event: FormEvent) {
     event.preventDefault();
@@ -105,10 +117,10 @@ export default function Home() {
       const body = await response.json();
       if (!response.ok) throw new Error(body.message ?? "Could not schedule this auction.");
       setSchedule({ title: "", startsAt: "", revealAt: "", endsAt: "" });
-      setNotice("Auction scheduled successfully.");
+      setToast({ kind: "success", message: "Auction scheduled successfully." });
       await loadAuctions();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Unable to schedule auction.");
+      setToast({ kind: "error", message: error instanceof Error ? error.message : "Unable to schedule auction." });
     } finally {
       setIsSubmitting(false);
     }
@@ -119,12 +131,14 @@ export default function Home() {
     if (!selected) return;
     const amountCents = Math.round(Number(amount) * 100);
     if (!Number.isSafeInteger(amountCents) || amountCents < 1) {
-      setNotice("Enter a valid bid amount.");
+      setToast({ kind: "error", message: "Enter a valid bid amount in US dollars." });
       return;
     }
     setIsSubmitting(true);
     try {
       if (selected.status === "COMMITTING") {
+        const replacing = selected.hasCurrentUserCommitment;
+        setToast({ kind: "info", message: replacing ? "Replacing your sealed offer…" : "Creating your sealed offer…" });
         const nonce = crypto.randomUUID();
         const commitmentHash = await sha256(`${selected.id}:${demoUser.id}:${amountCents}:${nonce}`);
         const response = await fetch(`${API_URL}/auctions/${selected.id}/commitments`, {
@@ -133,22 +147,35 @@ export default function Home() {
         const body = await response.json();
         if (!response.ok) throw new Error(body.message ?? "Could not submit your sealed bid.");
         localStorage.setItem(`auction-nonce:${selected.id}`, JSON.stringify({ nonce, amountCents }));
-        setNotice("Sealed bid committed. Keep this browser data safe; it is required to reveal your bid.");
+        setHasRevealCredentials(true);
+        setToast({
+          kind: "success",
+          message: replacing
+            ? "Sealed offer replaced successfully. This browser now holds the credentials required to reveal it."
+            : "Sealed offer committed successfully. This browser holds the credentials required to reveal it.",
+        });
       } else if (selected.status === "REVEALING") {
         const saved = localStorage.getItem(`auction-nonce:${selected.id}`);
-        if (!saved) throw new Error("This browser has no saved commitment for this auction.");
+        if (!saved) {
+          setToast({
+            kind: "error",
+            message: "Maya Chen has a commitment, but this browser does not hold its amount and nonce. It cannot be revealed here.",
+          });
+          return;
+        }
+        setToast({ kind: "info", message: "Verifying Maya Chen’s saved amount and nonce against the auction commitment…" });
         const { nonce, amountCents: committedAmount } = JSON.parse(saved) as { nonce: string; amountCents: number };
         const response = await fetch(`${API_URL}/auctions/${selected.id}/reveal`, {
           method: "POST", headers, body: JSON.stringify({ nonce, amountCents: committedAmount }),
         });
         const body = await response.json();
         if (!response.ok) throw new Error(body.message ?? "Could not reveal your bid.");
-        setNotice("Your bid has been revealed and will be considered when the auction closes.");
+        setToast({ kind: "success", message: "Maya Chen’s offer was verified and revealed. It will be considered when the auction closes." });
       }
       setAmount("");
       await loadAuctions();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Unable to submit bid.");
+      setToast({ kind: "error", message: error instanceof Error ? error.message : "Unable to submit bid." });
     } finally {
       setIsSubmitting(false);
     }
@@ -169,7 +196,7 @@ export default function Home() {
         <p>Every offer stays encrypted until the reveal window. The highest verified bid wins.</p>
       </section>
 
-      {notice && <p className="notice" role="status">{notice}</p>}
+      {toast && <div className={`toast ${toast.kind}`} role="status"><span>{toast.message}</span><button aria-label="Dismiss notification" onClick={() => setToast(null)}>×</button></div>}
       <div className="mode-switch">
         <span>Demo view</span>
         <button className={role === "BIDDER" ? "active" : ""} onClick={() => setRole("BIDDER")}>Bidder</button>
@@ -274,8 +301,9 @@ export default function Home() {
                 ) : (
                   <>
                     <h3>Reveal your offer</h3>
-                    <p>We will verify the offer stored in this browser against your original commitment.</p>
-                    <button disabled={isSubmitting}>{isSubmitting ? "Verifying..." : "Reveal bid"}</button>
+                    <p>You are viewing as Maya Chen. Revealing sends this browser’s saved amount and private nonce to the API, which verifies them against Maya Chen’s original commitment.</p>
+                    {!hasRevealCredentials && <p className="credential-warning">This browser does not have Maya Chen’s reveal credentials, so it cannot reveal this seeded commitment.</p>}
+                    <button disabled={isSubmitting || !hasRevealCredentials}>{isSubmitting ? "Verifying..." : hasRevealCredentials ? "Reveal Maya Chen’s bid" : "Reveal credentials unavailable"}</button>
                   </>
                 )}
               </form>
