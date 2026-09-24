@@ -162,6 +162,8 @@ export default function Home() {
         if (!response.ok) throw new Error(body.message ?? "Could not submit your sealed bid.");
         localStorage.setItem(`auction-nonce:${selected.id}`, JSON.stringify({ nonce, amountCents }));
         setHasRevealCredentials(true);
+        setRevealAmount((amountCents / 100).toFixed(2));
+        setRevealNonce(nonce);
         setToast({
           kind: "success",
           message: replacing
@@ -189,6 +191,18 @@ export default function Home() {
       setToast({ kind: "error", message: error instanceof Error ? error.message : "Unable to submit bid." });
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function copyRevealCredentials() {
+    if (!selected || !hasRevealCredentials) return;
+    try {
+      await navigator.clipboard.writeText(
+        `Auction: ${selected.title}\nOriginal offer: $${revealAmount}\nReveal nonce: ${revealNonce}`,
+      );
+      setToast({ kind: "success", message: "Reveal credentials copied. Store them securely until the reveal phase." });
+    } catch {
+      setToast({ kind: "error", message: "Unable to copy credentials. Select and save the values manually." });
     }
   }
 
@@ -341,6 +355,18 @@ export default function Home() {
                     ))}
                   </ul>
                 ) : <p>You have not committed an offer for this auction.</p>}
+              </section>
+            )}
+            {role === "BIDDER" && selected.status === "COMMITTING" && hasRevealCredentials && (
+              <section className="reveal-credentials" aria-label="Reveal credentials">
+                <p className="eyebrow">SAVE FOR REVEAL</p>
+                <h3>Your private reveal credentials</h3>
+                <p>These values are stored only in this browser. Copy and store them securely; you must provide both during the reveal phase.</p>
+                <dl>
+                  <div><dt>Original offer</dt><dd>{revealAmount ? `$${revealAmount}` : "Unavailable"}</dd></div>
+                  <div><dt>Private nonce</dt><dd className="nonce">{revealNonce}</dd></div>
+                </dl>
+                <button type="button" onClick={() => void copyRevealCredentials()}>Copy reveal credentials</button>
               </section>
             )}
             {role === "ADMIN" && (selected.status === "COMMITTING" || selected.status === "REVEALING") && (
