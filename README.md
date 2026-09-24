@@ -39,7 +39,9 @@ Run `npm test` for focused auction-rule tests. They cover lifecycle time boundar
 
 The API, not the UI, enforces the auction lifecycle. It rejects invalid timelines; commitments submitted before the start, after the reveal phase, or after close; reveals outside the reveal phase; missing commitments; and reveals whose amount or nonce does not reproduce the stored commitment. Invalid or non-positive amounts are rejected.
 
-Only one commitment is retained per bidder. A bidder may replace it during the commitment phase, but never after reveal begins. Unrevealed or invalid bids cannot win. If valid bids tie, the earliest commitment wins deterministically. The frontend communicates unavailable auction actions, empty catalogues, unavailable API connections, and the loss of local commitment data.
+Only one active commitment is retained per bidder; replaced commitments remain in the audit history. A bidder may replace the active commitment during the commitment phase, but never after reveal begins. Unrevealed or invalid bids cannot win. If valid bids tie, the earliest commitment wins deterministically. The frontend communicates unavailable auction actions, empty catalogues, unavailable API connections, and the loss of local commitment data.
+
+Additional safeguards include SHA-256-format validation for commitments, a maximum offer of $10,000,000.00, future-only auction scheduling, one active commitment per bidder enforced by a database index, and duplicate-reveal rejection. The browser refreshes auction state every 15 seconds; the server remains authoritative at every phase boundary.
 
 ## Deliberate production follow-ups
 

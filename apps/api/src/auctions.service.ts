@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,7 +9,7 @@ import { Auction, Bid, Prisma, Role } from '@prisma/client';
 import { CurrentUser } from './auth.js';
 import { CommitBidDto, CreateAuctionDto, RevealBidDto } from './auction.dto.js';
 import { PrismaService } from './prisma.service.js';
-import { getAuctionStatus, hasValidTimeline, selectWinner } from './auction-rules.js';
+import { getAuctionStatus, hasValidTimeline, isCommitmentHash, selectWinner } from './auction-rules.js';
 
 type AuctionWithBids = Auction & { bids: (Bid & { bidder: { name: string } })[] };
 
@@ -19,6 +20,9 @@ export class AuctionsService {
   async create(dto: CreateAuctionDto) {
     if (!hasValidTimeline(dto)) {
       throw new BadRequestException('Auction times must satisfy start < reveal < end.');
+    }
+    if (dto.startsAt <= new Date()) {
+      throw new BadRequestException('Auction start time must be in the future.');
     }
     return this.prisma.auction.create({ data: dto });
   }
@@ -54,6 +58,9 @@ export class AuctionsService {
   async commit(auctionId: string, user: CurrentUser, dto: CommitBidDto) {
     const auction = await this.getAuction(auctionId);
     if (user.role !== Role.BIDDER) throw new BadRequestException('Only bidders may commit bids.');
+    if (!isCommitmentHash(dto.commitmentHash)) {
+      throw new BadRequestException('Commitment must be a valid SHA-256 hash.');
+    }
     if (getAuctionStatus(auction) !== 'COMMITTING') {
       throw new BadRequestException('Bids can only be committed during the commitment phase.');
     }
@@ -84,6 +91,9 @@ export class AuctionsService {
       orderBy: { committedAt: 'desc' },
     });
     if (!bid) throw new NotFoundException('No commitment was submitted for this auction.');
+    if (bid.revealedAt) {
+      throw new ConflictException('This bid has already been revealed.');
+    }
     const expected = this.commitment(auctionId, user.id, dto.amountCents, dto.nonce);
     if (expected !== bid.commitmentHash) {
       throw new BadRequestException(

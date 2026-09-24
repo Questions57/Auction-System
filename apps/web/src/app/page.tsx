@@ -76,6 +76,8 @@ export default function Home() {
 
   useEffect(() => {
     void loadAuctions();
+    const interval = window.setInterval(() => void loadAuctions(), 15_000);
+    return () => window.clearInterval(interval);
   }, [role]);
 
   useEffect(() => {
@@ -326,7 +328,7 @@ export default function Home() {
                 {selected.status === "COMMITTING" ? (
                   <>
                     <label htmlFor="amount">Your sealed offer (USD)</label>
-                    <input id="amount" type="number" min="0.01" step="0.01" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" required />
+                    <input id="amount" type="number" min="0.01" max="10000000" step="0.01" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" required />
                     <p>
                       {selected.hasCurrentUserCommitment
                         ? "You already have a sealed offer. Submitting again safely replaces it until the reveal period begins."
@@ -343,7 +345,7 @@ export default function Home() {
                     <div className="reveal-fields">
                       <div>
                         <label htmlFor="reveal-amount">Original offer (USD)</label>
-                        <input id="reveal-amount" type="number" min="0.01" step="0.01" value={revealAmount} onChange={(event) => { setRevealAmount(event.target.value); setRevealError(null); }} placeholder="0.00" required />
+                        <input id="reveal-amount" type="number" min="0.01" max="10000000" step="0.01" value={revealAmount} onChange={(event) => { setRevealAmount(event.target.value); setRevealError(null); }} placeholder="0.00" required />
                       </div>
                       <div>
                         <label htmlFor="reveal-nonce">Private reveal nonce</label>

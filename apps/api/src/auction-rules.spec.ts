@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getAuctionStatus, hasValidTimeline, selectWinner } from './auction-rules.js';
+import { getAuctionStatus, hasValidTimeline, isCommitmentHash, MAX_BID_CENTS, selectWinner } from './auction-rules.js';
 
 const startsAt = new Date('2026-01-01T10:00:00Z');
 const revealAt = new Date('2026-01-01T11:00:00Z');
@@ -20,6 +20,12 @@ describe('auction rules', () => {
     expect(hasValidTimeline({ startsAt: revealAt, revealAt: startsAt, endsAt })).toBe(false);
   });
 
+  it('recognizes only SHA-256 commitment hashes and establishes an explicit bid ceiling', () => {
+    expect(isCommitmentHash('a'.repeat(64))).toBe(true);
+    expect(isCommitmentHash('not-a-hash')).toBe(false);
+    expect(MAX_BID_CENTS).toBe(1_000_000_000);
+  });
+
   it('selects the highest valid reveal and breaks a tie by earliest commitment', () => {
     const winner = selectWinner([
       { amountCents: 2500, committedAt: new Date('2026-01-01T10:01:00Z') },
@@ -31,4 +37,3 @@ describe('auction rules', () => {
     expect(winner).toMatchObject({ amountCents: 3000, committedAt: new Date('2026-01-01T10:02:00Z') });
   });
 });
-
