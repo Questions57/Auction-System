@@ -12,6 +12,7 @@ type Auction = {
   revealAt: string;
   endsAt: string;
   status: "SCHEDULED" | "COMMITTING" | "REVEALING" | "CLOSED";
+  hasCurrentUserCommitment: boolean;
   winner?: { bidderName: string; amountCents: number };
 };
 
@@ -203,9 +204,15 @@ export default function Home() {
                 {selected.status === "COMMITTING" ? (
                   <>
                     <label htmlFor="amount">Your sealed offer (USD)</label>
-                    <input id="amount" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" required />
-                    <p>Your amount and a private random nonce are hashed in your browser. Only the hash is sent now.</p>
-                    <button disabled={isSubmitting}>{isSubmitting ? "Committing..." : "Commit sealed bid"}</button>
+                    <input id="amount" type="number" min="0.01" step="0.01" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" required />
+                    <p>
+                      {selected.hasCurrentUserCommitment
+                        ? "You already have a sealed offer. Submitting again safely replaces it until the reveal period begins."
+                        : "Your amount and a private random nonce are hashed in your browser. Only the hash is sent now."}
+                    </p>
+                    <button disabled={isSubmitting}>
+                      {isSubmitting ? "Saving..." : selected.hasCurrentUserCommitment ? "Replace sealed bid" : "Commit sealed bid"}
+                    </button>
                   </>
                 ) : (
                   <>

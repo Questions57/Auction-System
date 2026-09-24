@@ -23,7 +23,7 @@ export class AuctionsService {
     return this.prisma.auction.create({ data: dto });
   }
 
-  async findAll() {
+  async findAll(viewer: CurrentUser) {
     const auctions = await this.prisma.auction.findMany({
       orderBy: { startsAt: 'asc' },
       include: { bids: { include: { bidder: { select: { name: true } } } } },
@@ -36,6 +36,7 @@ export class AuctionsService {
         ...auctionSummary,
         status,
         winner: winner && { bidderName: winner.bidder.name, amountCents: winner.amountCents },
+        hasCurrentUserCommitment: bids.some((bid) => bid.bidderId === viewer.id),
       };
     });
   }

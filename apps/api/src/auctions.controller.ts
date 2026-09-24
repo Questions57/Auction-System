@@ -12,8 +12,8 @@ export class AuctionsController {
   constructor(private readonly auctions: AuctionsService) {}
 
   @Get()
-  list() {
-    return this.auctions.findAll();
+  list(@Req() req: AuthenticatedRequest) {
+    return this.auctions.findAll(req.user);
   }
 
   @Get(':id')
