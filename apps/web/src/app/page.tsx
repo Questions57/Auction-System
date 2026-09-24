@@ -1,0 +1,204 @@
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+type Auction = {
+  id: string;
+  title: string;
+  description?: string;
+  startsAt: string;
+  revealAt: string;
+  endsAt: string;
+  status: "SCHEDULED" | "COMMITTING" | "REVEALING" | "CLOSED";
+  winner?: { bidderName: string; amountCents: number };
+};
+
+const demoUser = { id: "demo-bidder", role: "BIDDER" };
+
+function money(cents: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+}
+
+async function sha256(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(hash)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export default function Home() {
+  const [auctions, setAuctions] = useState<Auction[]>([]);
+  const [selected, setSelected] = useState<Auction | null>(null);
+  const [amount, setAmount] = useState("");
+  const [notice, setNotice] = useState("Loading auctions...");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [role, setRole] = useState<"BIDDER" | "ADMIN">("BIDDER");
+  const [schedule, setSchedule] = useState({ title: "", startsAt: "", revealAt: "", endsAt: "" });
+
+  const headers = useMemo(
+    () => ({ "Content-Type": "application/json", "x-user-id": role === "ADMIN" ? "demo-admin" : demoUser.id, "x-user-role": role }),
+    [role],
+  );
+
+  async function loadAuctions() {
+    try {
+      const response = await fetch(`${API_URL}/auctions`, { headers });
+      if (!response.ok) throw new Error("The auction service is unavailable.");
+      const data = await response.json();
+      setAuctions(data);
+      setSelected((current) => data.find((auction: Auction) => auction.id === current?.id) ?? data[0] ?? null);
+      setNotice(data.length ? "" : "No auctions have been scheduled yet.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to load auctions.");
+    }
+  }
+
+  useEffect(() => {
+    void loadAuctions();
+  }, [role]);
+
+  async function createAuction(event: FormEvent) {
+    event.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${API_URL}/auctions`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          title: schedule.title,
+          startsAt: new Date(schedule.startsAt).toISOString(),
+          revealAt: new Date(schedule.revealAt).toISOString(),
+          endsAt: new Date(schedule.endsAt).toISOString(),
+        }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.message ?? "Could not schedule this auction.");
+      setSchedule({ title: "", startsAt: "", revealAt: "", endsAt: "" });
+      setNotice("Auction scheduled successfully.");
+      await loadAuctions();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to schedule auction.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function submitBid(event: FormEvent) {
+    event.preventDefault();
+    if (!selected) return;
+    const amountCents = Math.round(Number(amount) * 100);
+    if (!Number.isSafeInteger(amountCents) || amountCents < 1) {
+      setNotice("Enter a valid bid amount.");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      if (selected.status === "COMMITTING") {
+        const nonce = crypto.randomUUID();
+        const commitmentHash = await sha256(`${selected.id}:${demoUser.id}:${amountCents}:${nonce}`);
+        const response = await fetch(`${API_URL}/auctions/${selected.id}/commitments`, {
+          method: "POST", headers, body: JSON.stringify({ commitmentHash }),
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.message ?? "Could not submit your sealed bid.");
+        localStorage.setItem(`auction-nonce:${selected.id}`, JSON.stringify({ nonce, amountCents }));
+        setNotice("Sealed bid committed. Keep this browser data safe; it is required to reveal your bid.");
+      } else if (selected.status === "REVEALING") {
+        const saved = localStorage.getItem(`auction-nonce:${selected.id}`);
+        if (!saved) throw new Error("This browser has no saved commitment for this auction.");
+        const { nonce, amountCents: committedAmount } = JSON.parse(saved) as { nonce: string; amountCents: number };
+        const response = await fetch(`${API_URL}/auctions/${selected.id}/reveal`, {
+          method: "POST", headers, body: JSON.stringify({ nonce, amountCents: committedAmount }),
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.message ?? "Could not reveal your bid.");
+        setNotice("Your bid has been revealed and will be considered when the auction closes.");
+      }
+      setAmount("");
+      await loadAuctions();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to submit bid.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <main>
+      <header className="hero">
+        <div>
+          <p className="eyebrow">NORTHSTAR AUCTION HOUSE</p>
+          <h1>Bid with conviction.<br />Reveal with confidence.</h1>
+        </div>
+        <div className="identity"><span className="live-dot" /> Signed in as Demo {role === "ADMIN" ? "Administrator" : "Bidder"}</div>
+      </header>
+
+      <section className="intro">
+        <div><p className="eyebrow">CURRENT CATALOGUE</p><h2>Quietly competitive.</h2></div>
+        <p>Every offer stays encrypted until the reveal window. The highest verified bid wins.</p>
+      </section>
+
+      {notice && <p className="notice" role="status">{notice}</p>}
+      <div className="mode-switch">
+        <span>Demo view</span>
+        <button className={role === "BIDDER" ? "active" : ""} onClick={() => setRole("BIDDER")}>Bidder</button>
+        <button className={role === "ADMIN" ? "active" : ""} onClick={() => setRole("ADMIN")}>Administrator</button>
+      </div>
+      {role === "ADMIN" && (
+        <form className="schedule-form" onSubmit={createAuction}>
+          <div><p className="eyebrow">ADMINISTRATION</p><h3>Schedule an auction</h3></div>
+          <input aria-label="Auction title" value={schedule.title} onChange={(event) => setSchedule({ ...schedule, title: event.target.value })} placeholder="Auction title" required />
+          <input aria-label="Commitment start" type="datetime-local" value={schedule.startsAt} onChange={(event) => setSchedule({ ...schedule, startsAt: event.target.value })} required />
+          <input aria-label="Reveal start" type="datetime-local" value={schedule.revealAt} onChange={(event) => setSchedule({ ...schedule, revealAt: event.target.value })} required />
+          <input aria-label="Auction end" type="datetime-local" value={schedule.endsAt} onChange={(event) => setSchedule({ ...schedule, endsAt: event.target.value })} required />
+          <button disabled={isSubmitting}>{isSubmitting ? "Scheduling..." : "Schedule"}</button>
+        </form>
+      )}
+      <section className="layout">
+        <aside className="auction-list" aria-label="Auctions">
+          {auctions.map((auction) => (
+            <button className={`auction-card ${auction.id === selected?.id ? "selected" : ""}`} key={auction.id} onClick={() => setSelected(auction)}>
+              <span className={`status ${auction.status.toLowerCase()}`}>{auction.status}</span>
+              <strong>{auction.title}</strong>
+              <small>Ends {new Date(auction.endsAt).toLocaleString()}</small>
+            </button>
+          ))}
+        </aside>
+
+        {selected && (
+          <article className="detail">
+            <div className="detail-top">
+              <div><span className={`status ${selected.status.toLowerCase()}`}>{selected.status}</span><h2>{selected.title}</h2></div>
+              {selected.winner && <p className="winner">Winner: {selected.winner.bidderName} — {money(selected.winner.amountCents)}</p>}
+            </div>
+            <p className="description">{selected.description || "A carefully selected lot from the Northstar collection."}</p>
+            <dl className="timeline">
+              <div><dt>Commitment opens</dt><dd>{new Date(selected.startsAt).toLocaleString()}</dd></div>
+              <div><dt>Reveal begins</dt><dd>{new Date(selected.revealAt).toLocaleString()}</dd></div>
+              <div><dt>Auction closes</dt><dd>{new Date(selected.endsAt).toLocaleString()}</dd></div>
+            </dl>
+            {(selected.status === "COMMITTING" || selected.status === "REVEALING") && (
+              <form onSubmit={submitBid} className="bid-form">
+                {selected.status === "COMMITTING" ? (
+                  <>
+                    <label htmlFor="amount">Your sealed offer (USD)</label>
+                    <input id="amount" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" required />
+                    <p>Your amount and a private random nonce are hashed in your browser. Only the hash is sent now.</p>
+                    <button disabled={isSubmitting}>{isSubmitting ? "Committing..." : "Commit sealed bid"}</button>
+                  </>
+                ) : (
+                  <>
+                    <h3>Reveal your offer</h3>
+                    <p>We will verify the offer stored in this browser against your original commitment.</p>
+                    <button disabled={isSubmitting}>{isSubmitting ? "Verifying..." : "Reveal bid"}</button>
+                  </>
+                )}
+              </form>
+            )}
+          </article>
+        )}
+      </section>
+    </main>
+  );
+}

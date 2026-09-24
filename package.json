@@ -1,0 +1,10 @@
+{
+  "name": "northstar-auction-house",
+  "private": true,
+  "scripts": {
+    "dev:api": "npm run start:dev --prefix apps/api",
+    "dev:web": "npm run dev --prefix apps/web",
+    "build": "npm run build --prefix apps/api && npm run build --prefix apps/web",
+    "test": "npm run test --prefix apps/api"
+  }
+}

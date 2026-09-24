@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  BIDDER
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      Role     @default(BIDDER)
+  createdAt DateTime @default(now())
+  bids      Bid[]
+}
+
+model Auction {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  startsAt    DateTime
+  revealAt    DateTime
+  endsAt      DateTime
+  createdAt   DateTime @default(now())
+  bids        Bid[]
+}
+
+model Bid {
+  id             String   @id @default(cuid())
+  auctionId      String
+  bidderId       String
+  commitmentHash String
+  amountCents    Int?
+  nonce          String?
+  committedAt    DateTime @default(now())
+  revealedAt     DateTime?
+  auction        Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  bidder         User     @relation(fields: [bidderId], references: [id], onDelete: Cascade)
+
+  @@unique([auctionId, bidderId])
+  @@index([auctionId])
+}
+
