@@ -70,6 +70,7 @@ export class AuctionsService {
 
   async reveal(auctionId: string, user: CurrentUser, dto: RevealBidDto) {
     const auction = await this.getAuction(auctionId);
+    if (user.role !== Role.BIDDER) throw new BadRequestException('Only bidders may reveal bids.');
     if (getAuctionStatus(auction) !== 'REVEALING') {
       throw new BadRequestException('Bids can only be revealed during the reveal phase.');
     }

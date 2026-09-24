@@ -283,7 +283,7 @@ export default function Home() {
               <div><dt>Reveal begins</dt><dd>{new Date(selected.revealAt).toLocaleString()}</dd></div>
               <div><dt>Auction closes</dt><dd>{new Date(selected.endsAt).toLocaleString()}</dd></div>
             </dl>
-            {(selected.status === "COMMITTING" || selected.status === "REVEALING") && (
+            {role === "BIDDER" && (selected.status === "COMMITTING" || selected.status === "REVEALING") && (
               <form onSubmit={submitBid} className="bid-form">
                 {selected.status === "COMMITTING" ? (
                   <>
@@ -307,6 +307,9 @@ export default function Home() {
                   </>
                 )}
               </form>
+            )}
+            {role === "ADMIN" && (selected.status === "COMMITTING" || selected.status === "REVEALING") && (
+              <p className="admin-read-only">Administrator view is read-only. Bid actions are available only to authorized bidders.</p>
             )}
           </article>
         )}
