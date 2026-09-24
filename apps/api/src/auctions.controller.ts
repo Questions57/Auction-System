@@ -24,7 +24,7 @@ export class AuctionsController {
   @Post()
   create(@Body() dto: CreateAuctionDto, @Req() req: AuthenticatedRequest) {
     requireAdmin(req.user);
-    return this.auctions.create(dto);
+    return this.auctions.create(dto, req.user);
   }
 
   @Post(':id/commitments')
@@ -35,5 +35,11 @@ export class AuctionsController {
   @Post(':id/reveal')
   reveal(@Param('id') id: string, @Body() dto: RevealBidDto, @Req() req: AuthenticatedRequest) {
     return this.auctions.reveal(id, req.user, dto);
+  }
+
+  @Post(':id/finalize')
+  finalize(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    requireAdmin(req.user);
+    return this.auctions.finalize(id, req.user);
   }
 }

@@ -33,7 +33,13 @@ Interactive API documentation is available at `http://localhost:3001/api/docs`. 
 
 ## Testing
 
-Run `npm test` for focused auction-rule tests. They cover lifecycle time boundaries, timeline validation, valid-reveal selection, and deterministic tie-breaking.
+Run `npm test` for focused auction-rule tests. They cover lifecycle time boundaries, timeline validation, valid-reveal selection, deterministic tie-breaking, commitment-hash validation, and money bounds.
+
+Run `npm run test:e2e` in `apps/api` for isolated HTTP integration tests covering authentication, role boundaries, commitment replacement history, idempotent auction finalization, and audit events. GitHub Actions runs both test suites plus the API and frontend production builds on pushes and pull requests.
+
+## Finalization and audit trail
+
+Closed auctions can be finalized by an administrator from the bid-audit panel or through `POST /auctions/:id/finalize`. Finalization is idempotent: it persists either a `SOLD` outcome with the winner snapshot or a `NO_SALE` outcome, and writes an immutable `AUCTION_FINALIZED` event. The administrator panel also records auction creation, commitment/replacement, reveal, and finalization events.
 
 ## Edge cases and graceful handling
 

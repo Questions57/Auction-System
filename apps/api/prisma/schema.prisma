@@ -12,6 +12,19 @@ enum Role {
   BIDDER
 }
 
+enum AuctionEventType {
+  AUCTION_CREATED
+  BID_COMMITTED
+  BID_REPLACED
+  BID_REVEALED
+  AUCTION_FINALIZED
+}
+
+enum AuctionOutcomeStatus {
+  SOLD
+  NO_SALE
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -30,6 +43,8 @@ model Auction {
   endsAt      DateTime
   createdAt   DateTime @default(now())
   bids        Bid[]
+  outcome     AuctionOutcome?
+  events      AuctionEvent[]
 }
 
 model Bid {
@@ -47,4 +62,26 @@ model Bid {
 
   @@index([auctionId])
   @@index([auctionId, bidderId, replacedAt])
+}
+
+model AuctionOutcome {
+  auctionId          String               @id
+  status             AuctionOutcomeStatus
+  winnerBidId        String?
+  winnerBidderName   String?
+  winningAmountCents Int?
+  finalizedAt        DateTime             @default(now())
+  auction            Auction              @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+}
+
+model AuctionEvent {
+  id        String           @id @default(cuid())
+  auctionId String
+  actorId   String?
+  type      AuctionEventType
+  details   String?
+  createdAt DateTime         @default(now())
+  auction   Auction          @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+
+  @@index([auctionId, createdAt])
 }

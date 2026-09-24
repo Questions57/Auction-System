@@ -27,6 +27,8 @@ type AuctionDetail = Auction & {
     amountCents?: number | null;
     isCurrentUser: boolean;
   }[];
+  outcome?: { status: "SOLD" | "NO_SALE"; finalizedAt: string } | null;
+  events?: { type: string; actorId?: string; createdAt: string }[];
 };
 
 const demoUser = { id: "demo-bidder", role: "BIDDER" };
@@ -138,6 +140,22 @@ export default function Home() {
       await loadAuctions();
     } catch (error) {
       setToast({ kind: "error", message: error instanceof Error ? error.message : "Unable to schedule auction." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function finalizeAuction() {
+    if (!selected) return;
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${API_URL}/auctions/${selected.id}/finalize`, { method: "POST", headers });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.message ?? "Could not finalize this auction.");
+      setToast({ kind: "success", message: body.status === "SOLD" ? "Auction finalized and outcome recorded." : "Auction finalized with no valid sale." });
+      await loadAuctions();
+    } catch (error) {
+      setToast({ kind: "error", message: error instanceof Error ? error.message : "Unable to finalize auction." });
     } finally {
       setIsSubmitting(false);
     }
@@ -255,7 +273,11 @@ export default function Home() {
             <section className="admin-panel" aria-label="Selected auction bid audit">
               <div className="admin-panel-title">
                 <div><p className="eyebrow">BID AUDIT</p><h3>{auctionDetail.title}</h3></div>
-                <span>{auctionDetail.bids.length} commitment{auctionDetail.bids.length === 1 ? "" : "s"}</span>
+                <div className="audit-actions">
+                  <span>{auctionDetail.bids.length} commitment{auctionDetail.bids.length === 1 ? "" : "s"}</span>
+                  {auctionDetail.status === "CLOSED" && !auctionDetail.outcome && <button onClick={() => void finalizeAuction()} disabled={isSubmitting}>Finalize auction</button>}
+                  {auctionDetail.outcome && <span className="finalized">Finalized · {auctionDetail.outcome.status.replace("_", " ")}</span>}
+                </div>
               </div>
               {auctionDetail.bids.length ? (
                 <div className="bid-table-wrap">
@@ -276,6 +298,19 @@ export default function Home() {
                   </table>
                 </div>
               ) : <p className="empty-audit">No commitments have been submitted for this auction.</p>}
+              {auctionDetail.events?.length ? (
+                <div className="event-log">
+                  <p className="eyebrow">AUDIT EVENTS</p>
+                  <ul>
+                    {auctionDetail.events.map((event, index) => (
+                      <li key={`${event.type}-${event.createdAt}-${index}`}>
+                        <strong>{event.type.replaceAll("_", " ")}</strong>
+                        <span>{new Date(event.createdAt).toLocaleString()}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </section>
           )}
         </>
