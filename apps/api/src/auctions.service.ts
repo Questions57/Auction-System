@@ -86,7 +86,9 @@ export class AuctionsService {
     if (!bid) throw new NotFoundException('No commitment was submitted for this auction.');
     const expected = this.commitment(auctionId, user.id, dto.amountCents, dto.nonce);
     if (expected !== bid.commitmentHash) {
-      throw new BadRequestException('Reveal does not match the submitted commitment.');
+      throw new BadRequestException(
+        'No match for this amount and nonce. Check the original offer and private nonce, then try again.',
+      );
     }
     return this.prisma.bid.update({
       where: { id: bid.id },

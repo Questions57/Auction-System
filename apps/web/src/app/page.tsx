@@ -328,10 +328,16 @@ export default function Home() {
                   <>
                     <h3>Reveal your offer</h3>
                     <p>You are viewing as Adarsh Patel. Reveal the original offer and private nonce; the API verifies both against Adarsh Patel’s commitment.</p>
-                    <label htmlFor="reveal-amount">Original offer (USD)</label>
-                    <input id="reveal-amount" type="number" min="0.01" step="0.01" value={revealAmount} onChange={(event) => setRevealAmount(event.target.value)} placeholder="0.00" required />
-                    <label htmlFor="reveal-nonce">Private reveal nonce</label>
-                    <input id="reveal-nonce" value={revealNonce} onChange={(event) => setRevealNonce(event.target.value)} placeholder="Paste the nonce saved at commitment time" required />
+                    <div className="reveal-fields">
+                      <div>
+                        <label htmlFor="reveal-amount">Original offer (USD)</label>
+                        <input id="reveal-amount" type="number" min="0.01" step="0.01" value={revealAmount} onChange={(event) => setRevealAmount(event.target.value)} placeholder="0.00" required />
+                      </div>
+                      <div>
+                        <label htmlFor="reveal-nonce">Private reveal nonce</label>
+                        <input id="reveal-nonce" value={revealNonce} onChange={(event) => setRevealNonce(event.target.value)} placeholder="Paste the nonce saved at commitment time" required />
+                      </div>
+                    </div>
                     {!hasRevealCredentials && <p className="credential-warning">This browser has no saved credentials. Enter the original offer and nonce from your secure record to reveal this bid.</p>}
                     <button disabled={isSubmitting}>{isSubmitting ? "Verifying..." : "Reveal Adarsh Patel’s bid"}</button>
                   </>
