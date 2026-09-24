@@ -58,7 +58,7 @@ export class AuctionsService {
     }
     await this.prisma.user.upsert({
       where: { id: user.id },
-      create: { id: user.id, email: `${user.id}@demo.auction`, name: 'Maya Chen', role: Role.BIDDER },
+      create: { id: user.id, email: `${user.id}@demo.auction`, name: 'Adarsh Patel', role: Role.BIDDER },
       update: {},
     });
     return this.prisma.bid.upsert({

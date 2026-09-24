@@ -169,16 +169,16 @@ export default function Home() {
       } else if (selected.status === "REVEALING") {
         const amountCents = Math.round(Number(revealAmount) * 100);
         if (!Number.isSafeInteger(amountCents) || amountCents < 1 || !revealNonce.trim()) {
-          setToast({ kind: "error", message: "Enter the original offer and reveal nonce for Maya Chen’s commitment." });
+          setToast({ kind: "error", message: "Enter the original offer and reveal nonce for Adarsh Patel’s commitment." });
           return;
         }
-        setToast({ kind: "info", message: "Verifying Maya Chen’s saved amount and nonce against the auction commitment…" });
+        setToast({ kind: "info", message: "Verifying Adarsh Patel’s saved amount and nonce against the auction commitment…" });
         const response = await fetch(`${API_URL}/auctions/${selected.id}/reveal`, {
           method: "POST", headers, body: JSON.stringify({ nonce: revealNonce.trim(), amountCents }),
         });
         const body = await response.json();
         if (!response.ok) throw new Error(body.message ?? "Could not reveal your bid.");
-        setToast({ kind: "success", message: "Maya Chen’s offer was verified and revealed. It will be considered when the auction closes." });
+        setToast({ kind: "success", message: "Adarsh Patel’s offer was verified and revealed. It will be considered when the auction closes." });
         setRevealNonce("");
       }
       setAmount("");
@@ -197,7 +197,7 @@ export default function Home() {
           <p className="eyebrow">NORTHSTAR AUCTION HOUSE</p>
           <h1>Bid with conviction.<br />Reveal with confidence.</h1>
         </div>
-        <div className="identity"><span className="live-dot" /> Signed in as {role === "ADMIN" ? "Elena Rossi, Administrator" : "Maya Chen"}</div>
+        <div className="identity"><span className="live-dot" /> Signed in as {role === "ADMIN" ? "Elena Rossi, Administrator" : "Adarsh Patel"}</div>
       </header>
 
       <section className="intro">
@@ -310,19 +310,19 @@ export default function Home() {
                 ) : (
                   <>
                     <h3>Reveal your offer</h3>
-                    <p>You are viewing as Maya Chen. Reveal the original offer and private nonce; the API verifies both against Maya Chen’s commitment.</p>
+                    <p>You are viewing as Adarsh Patel. Reveal the original offer and private nonce; the API verifies both against Adarsh Patel’s commitment.</p>
                     <label htmlFor="reveal-amount">Original offer (USD)</label>
                     <input id="reveal-amount" type="number" min="0.01" step="0.01" value={revealAmount} onChange={(event) => setRevealAmount(event.target.value)} placeholder="0.00" required />
                     <label htmlFor="reveal-nonce">Private reveal nonce</label>
                     <input id="reveal-nonce" value={revealNonce} onChange={(event) => setRevealNonce(event.target.value)} placeholder="Paste the nonce saved at commitment time" required />
                     {!hasRevealCredentials && <p className="credential-warning">This browser has no saved credentials. Enter the original offer and nonce from your secure record to reveal this bid.</p>}
-                    <button disabled={isSubmitting}>{isSubmitting ? "Verifying..." : "Reveal Maya Chen’s bid"}</button>
+                    <button disabled={isSubmitting}>{isSubmitting ? "Verifying..." : "Reveal Adarsh Patel’s bid"}</button>
                   </>
                 )}
               </form>
             )}
             {role === "BIDDER" && selected.status === "REVEALING" && !selected.hasCurrentUserCommitment && (
-              <p className="admin-read-only">Maya Chen did not commit an offer for this auction, so there is no bid available to reveal.</p>
+              <p className="admin-read-only">Adarsh Patel did not commit an offer for this auction, so there is no bid available to reveal.</p>
             )}
             {role === "ADMIN" && (selected.status === "COMMITTING" || selected.status === "REVEALING") && (
               <p className="admin-read-only">Administrator view is read-only. Bid actions are available only to authorized bidders.</p>
