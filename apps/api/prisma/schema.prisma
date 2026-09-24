@@ -40,11 +40,11 @@ model Bid {
   amountCents    Int?
   nonce          String?
   committedAt    DateTime @default(now())
+  replacedAt     DateTime?
   revealedAt     DateTime?
   auction        Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
   bidder         User     @relation(fields: [bidderId], references: [id], onDelete: Cascade)
 
-  @@unique([auctionId, bidderId])
   @@index([auctionId])
+  @@index([auctionId, bidderId, replacedAt])
 }
-

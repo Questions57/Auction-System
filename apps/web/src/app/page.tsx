@@ -22,8 +22,10 @@ type AuctionDetail = Auction & {
     bidderName?: string;
     commitmentHash?: string;
     committedAt: string;
+    replacedAt?: string | null;
     revealedAt?: string;
     amountCents?: number | null;
+    isCurrentUser: boolean;
   }[];
 };
 
@@ -90,7 +92,7 @@ export default function Home() {
       }
     }
     void loadAuctionDetail();
-  }, [selected?.id, role, headers]);
+  }, [selected, role, headers]);
 
   useEffect(() => {
     const saved = selected && localStorage.getItem(`auction-nonce:${selected.id}`);
@@ -230,12 +232,13 @@ export default function Home() {
               {auctionDetail.bids.length ? (
                 <div className="bid-table-wrap">
                   <table>
-                    <thead><tr><th>Bidder</th><th>Committed</th><th>Reveal</th><th>Amount</th><th>Commitment</th></tr></thead>
+                    <thead><tr><th>Bidder</th><th>Committed</th><th>Status</th><th>Reveal</th><th>Amount</th><th>Commitment</th></tr></thead>
                     <tbody>
                       {auctionDetail.bids.map((bid) => (
                         <tr key={bid.id}>
                           <td>{bid.bidderName}</td>
                           <td>{new Date(bid.committedAt).toLocaleString()}</td>
+                          <td>{bid.replacedAt ? "Replaced" : bid.revealedAt ? "Revealed" : "Active"}</td>
                           <td>{bid.revealedAt ? new Date(bid.revealedAt).toLocaleString() : "Pending"}</td>
                           <td>{bid.amountCents === null || bid.amountCents === undefined ? "Sealed" : money(bid.amountCents)}</td>
                           <td><code>{bid.commitmentHash?.slice(0, 12)}...</code></td>
@@ -323,6 +326,22 @@ export default function Home() {
             )}
             {role === "BIDDER" && selected.status === "REVEALING" && !selected.hasCurrentUserCommitment && (
               <p className="admin-read-only">Adarsh Patel did not commit an offer for this auction, so there is no bid available to reveal.</p>
+            )}
+            {role === "BIDDER" && auctionDetail && (
+              <section className="my-bids" aria-label="Your bid history">
+                <p className="eyebrow">YOUR BID HISTORY</p>
+                {auctionDetail.bids.filter((bid) => bid.isCurrentUser).length ? (
+                  <ul>
+                    {auctionDetail.bids.filter((bid) => bid.isCurrentUser).map((bid) => (
+                      <li key={bid.id}>
+                        <strong>{bid.replacedAt ? "Replaced sealed offer" : bid.revealedAt ? "Revealed offer" : "Active sealed offer"}</strong>
+                        <span>Committed {new Date(bid.committedAt).toLocaleString()}</span>
+                        {bid.replacedAt && <span>Replaced {new Date(bid.replacedAt).toLocaleString()}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p>You have not committed an offer for this auction.</p>}
+              </section>
             )}
             {role === "ADMIN" && (selected.status === "COMMITTING" || selected.status === "REVEALING") && (
               <p className="admin-read-only">Administrator view is read-only. Bid actions are available only to authorized bidders.</p>

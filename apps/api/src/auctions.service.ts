@@ -31,12 +31,13 @@ export class AuctionsService {
     return auctions.map((auction) => {
       const { bids, ...auctionSummary } = auction;
       const status = getAuctionStatus(auction);
-      const winner = status === 'CLOSED' ? selectWinner(bids) : undefined;
+      const activeBids = bids.filter((bid) => bid.replacedAt === null);
+      const winner = status === 'CLOSED' ? selectWinner(activeBids) : undefined;
       return {
         ...auctionSummary,
         status,
         winner: winner && { bidderName: winner.bidder.name, amountCents: winner.amountCents },
-        hasCurrentUserCommitment: bids.some((bid) => bid.bidderId === viewer.id),
+        hasCurrentUserCommitment: activeBids.some((bid) => bid.bidderId === viewer.id),
       };
     });
   }
@@ -61,10 +62,14 @@ export class AuctionsService {
       create: { id: user.id, email: `${user.id}@demo.auction`, name: 'Adarsh Patel', role: Role.BIDDER },
       update: {},
     });
-    return this.prisma.bid.upsert({
-      where: { auctionId_bidderId: { auctionId, bidderId: user.id } },
-      create: { auctionId, bidderId: user.id, commitmentHash: dto.commitmentHash.toLowerCase() },
-      update: { commitmentHash: dto.commitmentHash.toLowerCase(), amountCents: null, nonce: null, revealedAt: null },
+    return this.prisma.$transaction(async (transaction) => {
+      await transaction.bid.updateMany({
+        where: { auctionId, bidderId: user.id, replacedAt: null },
+        data: { replacedAt: new Date() },
+      });
+      return transaction.bid.create({
+        data: { auctionId, bidderId: user.id, commitmentHash: dto.commitmentHash.toLowerCase() },
+      });
     });
   }
 
@@ -74,7 +79,10 @@ export class AuctionsService {
     if (getAuctionStatus(auction) !== 'REVEALING') {
       throw new BadRequestException('Bids can only be revealed during the reveal phase.');
     }
-    const bid = await this.prisma.bid.findUnique({ where: { auctionId_bidderId: { auctionId, bidderId: user.id } } });
+    const bid = await this.prisma.bid.findFirst({
+      where: { auctionId, bidderId: user.id, replacedAt: null },
+      orderBy: { committedAt: 'desc' },
+    });
     if (!bid) throw new NotFoundException('No commitment was submitted for this auction.');
     const expected = this.commitment(auctionId, user.id, dto.amountCents, dto.nonce);
     if (expected !== bid.commitmentHash) {
@@ -99,7 +107,8 @@ export class AuctionsService {
   private present(auction: AuctionWithBids, viewer: CurrentUser) {
     const status = getAuctionStatus(auction);
     const canSeeReveals = status === 'CLOSED' || viewer.role === Role.ADMIN;
-    const winner = status === 'CLOSED' ? selectWinner(auction.bids) : undefined;
+    const activeBids = auction.bids.filter((bid) => bid.replacedAt === null);
+    const winner = status === 'CLOSED' ? selectWinner(activeBids) : undefined;
     return {
       ...auction,
       status,
@@ -107,10 +116,12 @@ export class AuctionsService {
       bids: auction.bids.map((bid) => ({
         id: bid.id,
         committedAt: bid.committedAt,
+        replacedAt: bid.replacedAt,
         revealedAt: bid.revealedAt,
         amountCents: canSeeReveals ? bid.amountCents : undefined,
         bidderName: viewer.role === Role.ADMIN || bid.bidderId === viewer.id ? bid.bidder.name : undefined,
         commitmentHash: viewer.role === Role.ADMIN ? bid.commitmentHash : undefined,
+        isCurrentUser: bid.bidderId === viewer.id,
       })),
     };
   }
