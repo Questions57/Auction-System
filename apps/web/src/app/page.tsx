@@ -161,7 +161,11 @@ export default function Home() {
             <button className={`auction-card ${auction.id === selected?.id ? "selected" : ""}`} key={auction.id} onClick={() => setSelected(auction)}>
               <span className={`status ${auction.status.toLowerCase()}`}>{auction.status}</span>
               <strong>{auction.title}</strong>
-              <small>Ends {new Date(auction.endsAt).toLocaleString()}</small>
+              {auction.winner ? (
+                <small className="card-winner">Won by {auction.winner.bidderName} · {money(auction.winner.amountCents)}</small>
+              ) : (
+                <small>Ends {new Date(auction.endsAt).toLocaleString()}</small>
+              )}
             </button>
           ))}
         </aside>
@@ -170,9 +174,25 @@ export default function Home() {
           <article className="detail">
             <div className="detail-top">
               <div><span className={`status ${selected.status.toLowerCase()}`}>{selected.status}</span><h2>{selected.title}</h2></div>
-              {selected.winner && <p className="winner">Winner: {selected.winner.bidderName} — {money(selected.winner.amountCents)}</p>}
             </div>
             <p className="description">{selected.description || "A carefully selected lot from the Northstar collection."}</p>
+            {selected.status === "CLOSED" && (
+              <section className="outcome" aria-label="Auction outcome">
+                <p className="eyebrow">AUCTION COMPLETE</p>
+                {selected.winner ? (
+                  <>
+                    <h3>{selected.winner.bidderName} placed the winning offer.</h3>
+                    <p className="outcome-price">{money(selected.winner.amountCents)}</p>
+                    <p>The highest valid revealed offer won. Any tied offer would be resolved by its earlier commitment time.</p>
+                  </>
+                ) : (
+                  <>
+                    <h3>This lot received no valid revealed offers.</h3>
+                    <p>The auction has closed without a winner.</p>
+                  </>
+                )}
+              </section>
+            )}
             <dl className="timeline">
               <div><dt>Commitment opens</dt><dd>{new Date(selected.startsAt).toLocaleString()}</dd></div>
               <div><dt>Reveal begins</dt><dd>{new Date(selected.revealAt).toLocaleString()}</dd></div>

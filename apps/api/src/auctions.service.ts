@@ -24,8 +24,20 @@ export class AuctionsService {
   }
 
   async findAll() {
-    const auctions = await this.prisma.auction.findMany({ orderBy: { startsAt: 'asc' } });
-    return auctions.map((auction) => ({ ...auction,     status: getAuctionStatus(auction) }));
+    const auctions = await this.prisma.auction.findMany({
+      orderBy: { startsAt: 'asc' },
+      include: { bids: { include: { bidder: { select: { name: true } } } } },
+    });
+    return auctions.map((auction) => {
+      const { bids, ...auctionSummary } = auction;
+      const status = getAuctionStatus(auction);
+      const winner = status === 'CLOSED' ? selectWinner(bids) : undefined;
+      return {
+        ...auctionSummary,
+        status,
+        winner: winner && { bidderName: winner.bidder.name, amountCents: winner.amountCents },
+      };
+    });
   }
 
   async findOne(id: string, viewer: CurrentUser) {
