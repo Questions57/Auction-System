@@ -14,8 +14,8 @@ async function main() {
   await prisma.user.createMany({
     data: [
       { id: 'demo-admin', email: 'admin@northstar.demo', name: 'Demo Administrator', role: Role.ADMIN },
-      { id: 'demo-bidder', email: 'bidder@northstar.demo', name: 'Demo Bidder', role: Role.BIDDER },
-      { id: 'rival-bidder', email: 'rival@northstar.demo', name: 'Rival Bidder', role: Role.BIDDER },
+      { id: 'demo-bidder', email: 'maya.chen@northstar.demo', name: 'Maya Chen', role: Role.BIDDER },
+      { id: 'rival-bidder', email: 'marcus.wells@northstar.demo', name: 'Marcus Wells', role: Role.BIDDER },
     ],
   });
 
@@ -63,4 +63,3 @@ main().then(() => prisma.$disconnect()).catch(async (error) => {
   await prisma.$disconnect();
   process.exit(1);
 });
-

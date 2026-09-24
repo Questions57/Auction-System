@@ -131,7 +131,7 @@ export default function Home() {
           <p className="eyebrow">NORTHSTAR AUCTION HOUSE</p>
           <h1>Bid with conviction.<br />Reveal with confidence.</h1>
         </div>
-        <div className="identity"><span className="live-dot" /> Signed in as Demo {role === "ADMIN" ? "Administrator" : "Bidder"}</div>
+        <div className="identity"><span className="live-dot" /> Signed in as {role === "ADMIN" ? "Elena Rossi, Administrator" : "Maya Chen"}</div>
       </header>
 
       <section className="intro">
